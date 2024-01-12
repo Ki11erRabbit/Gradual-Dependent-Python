@@ -1,0 +1,13 @@
+[package]
+name = "Gradual-Dependent-Python"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+
+[dependencies]
+rustpython-parser-core = { git = "https://github.com/Ki11erRabbit/GDP-Parser.git" }
+rustpython-parser = { git = "https://github.com/Ki11erRabbit/GDP-Parser.git" }
+rustpython-ast = { git = "https://github.com/Ki11erRabbit/GDP-Parser.git" }

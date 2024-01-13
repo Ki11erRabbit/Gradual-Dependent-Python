@@ -1,4 +1,4 @@
-use rustpython_ast::Mod;
+use rustpython_ast::{Mod, ModModule, Stmt};
 use rustpython_parser::ast::{self as ast, fold::Fold};
 
 pub use rustpython_parser::{source_code::LinearLocator, Parse};
@@ -40,20 +40,24 @@ fn get_ast(
     source: &str,
     mode: Mode,
     source_path: String,
-) -> Result<Mod<SourceRange>, CompileError> {
+) -> Result<ModModule<SourceRange>, CompileError> {
     let mut locator = LinearLocator::new(source);
     let ast = match parser::parse(source, mode.into(), &source_path) {
         Ok(x) => x,
         Err(e) => return Err(locator.locate_error(e)),
     };
     let ast = locator.fold_mod(ast).unwrap_or_else(|e| match e {});
+    let ast = match ast {
+        Mod::Module(module) => module,
+        _ => panic!("unexpected ast type"),
+    };
     Ok(ast)
 }
 
 pub fn compile(
     source: &str,
     source_path: String,
-) -> Result<Mod<SourceRange>, CompileError> {
+) -> Result<ModModule<SourceRange>, CompileError> {
     get_ast(source, Mode::Module, source_path)
 }
 

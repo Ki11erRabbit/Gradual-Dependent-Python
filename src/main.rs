@@ -1,4 +1,5 @@
 mod compiler;
+mod type_checker;
 
 use rustpython_ast::unparse;
 use compiler::compile;

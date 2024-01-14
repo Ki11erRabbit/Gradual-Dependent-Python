@@ -11,3 +11,4 @@ edition = "2021"
 rustpython-parser-core = { git = "https://github.com/Ki11erRabbit/GDP-Parser.git" }
 rustpython-parser = { git = "https://github.com/Ki11erRabbit/GDP-Parser.git" }
 rustpython-ast = { git = "https://github.com/Ki11erRabbit/GDP-Parser.git", features = ["unparse"] }
+

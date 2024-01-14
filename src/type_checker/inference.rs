@@ -1,4 +1,4 @@
-use rustpython_ast::{BoolOp, Expr, ExprBinOp, ExprBoolOp, ExprConstant, ExprNamedExpr, ExprUnaryOp, Operator, UnaryOp};
+use rustpython_ast::{BoolOp, CmpOp, Expr, ExprAwait, ExprBinOp, ExprBoolOp, ExprCall, ExprCompare, ExprConstant, ExprDict, ExprDictComp, ExprGeneratorExp, ExprIfExp, ExprLambda, ExprListComp, ExprNamedExpr, ExprSet, ExprSetComp, ExprUnaryOp, ExprYield, ExprYieldFrom, Operator, UnaryOp};
 use rustpython_ast::bigint::BigInt;
 use crate::type_checker::{Environment, KnownTerm, Term};
 
@@ -607,11 +607,11 @@ pub fn infer_type_expr<R>(ast: &Expr<R>, env: &mut Environment) -> Result<Term,S
             }
         },
         Expr::UnaryOp(ExprUnaryOp { op, operand, ..}) => {
-            match op {
+            return match op {
                 UnaryOp::Invert => {
                     let value = infer_type_expr(operand, env)?;
 
-                    return if let Term::Known(known) = value {
+                    if let Term::Known(known) = value {
                         let result = match known {
                             KnownTerm::Integer(None) => Term::Known(KnownTerm::Integer(None)),
                             KnownTerm::Integer(Some(i)) => Term::Known(KnownTerm::Integer(Some(!i.clone()))),
@@ -625,12 +625,11 @@ pub fn infer_type_expr<R>(ast: &Expr<R>, env: &mut Environment) -> Result<Term,S
                     } else {
                         Ok(Term::Unknown)
                     }
-
                 }
                 UnaryOp::Not => {
                     let value = infer_type_expr(operand, env)?;
 
-                    return if let Term::Known(known) = value {
+                    if let Term::Known(known) = value {
                         let result = match known {
                             KnownTerm::Integer(None) => Term::Known(KnownTerm::Bool(None)),
                             KnownTerm::Integer(Some(i)) if i != BigInt::from(0) => Term::Known(KnownTerm::Bool(Some(false))),
@@ -662,7 +661,7 @@ pub fn infer_type_expr<R>(ast: &Expr<R>, env: &mut Environment) -> Result<Term,S
                 UnaryOp::UAdd => {
                     let value = infer_type_expr(operand, env)?;
 
-                    return if let Term::Known(known) = value {
+                    if let Term::Known(known) = value {
                         let result = match known {
                             KnownTerm::Integer(None) => Term::Known(KnownTerm::Bool(None)),
                             KnownTerm::Integer(Some(i)) => Term::Known(KnownTerm::Integer(Some(i))),
@@ -683,7 +682,7 @@ pub fn infer_type_expr<R>(ast: &Expr<R>, env: &mut Environment) -> Result<Term,S
                 UnaryOp::USub => {
                     let value = infer_type_expr(operand, env)?;
 
-                    return if let Term::Known(known) = value {
+                    if let Term::Known(known) = value {
                         let result = match known {
                             KnownTerm::Integer(None) => Term::Known(KnownTerm::Bool(None)),
                             KnownTerm::Integer(Some(i)) => Term::Known(KnownTerm::Integer(Some(i * BigInt::from(-1)))),
@@ -703,6 +702,342 @@ pub fn infer_type_expr<R>(ast: &Expr<R>, env: &mut Environment) -> Result<Term,S
                 }
             }
         },
+        Expr::Lambda(ExprLambda {..}) => unimplemented!("Lambda"),
+        Expr::IfExp(ExprIfExp { test, body, orelse, ..}) => {
+            let test = infer_type_expr(test, env)?;
+            let body = infer_type_expr(body, env)?;
+            let orelse = infer_type_expr(orelse, env)?;
+
+            if let Term::Known(known) = test {
+                if test.is_truthy(env) {
+                    Ok(body)
+                } else {
+                    Ok(orelse)
+                }
+            } else {
+                Ok(Term::Unknown)
+            }
+        },
+        Expr::Dict(ExprDict {..}) => unimplemented!("Dict"),
+        Expr::Set(ExprSet {..}) => unimplemented!("Set"),
+        Expr::ListComp(ExprListComp {..}) => unimplemented!("ListComp"),
+        Expr::SetComp(ExprSetComp {..}) => unimplemented!("SetComp"),
+        Expr::DictComp(ExprDictComp {..}) => unimplemented!("DictComp"),
+        Expr::GeneratorExp(ExprGeneratorExp {..}) => unimplemented!("GeneratorExp"),
+        Expr::Await(ExprAwait {..}) => unimplemented!("Await"),
+        Expr::Yield(ExprYield {..}) => unimplemented!("Yield"),
+        Expr::YieldFrom(ExprYieldFrom {..}) => unimplemented!("YieldFrom"),
+        Expr::Compare(ExprCompare { left, ops, comparators, ..}) => {
+            let left = infer_type_expr(left, env)?;
+            let mut comparators = comparators.iter().map(|x| infer_type_expr(x, env)).collect::<Result<Vec<Term>, String>>()?;
+            comparators.insert(0, left);
+            let mut ops = ops.iter().map(|x| x.clone()).collect::<Vec<CmpOp>>();
+
+            let mut out = Err("Should not be seen".to_string());
+            while comparators.len () >= 2 {
+                let insert;
+                match ops[0] {
+                    CmpOp::Eq => {
+                        if let Term::Known(a) = &comparators[0] {
+                            if let Term::Known(b) = &comparators[1] {
+                                let result = match (a,b) {
+                                    (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Bool(Some(i1 == i2))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(i == BigInt::from(1)))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(1) == i))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(i == BigInt::from(0)))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(0) == i))),
+                                    (KnownTerm::Bool(Some(b1)), KnownTerm::Bool(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 == b2))),
+                                    (KnownTerm::Float(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(Some(f1)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Bool(Some(f1 == f2))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(f == 1.0))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(1.0 == f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(f == 0.0))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(0.0 == f))),
+                                    (KnownTerm::Integer(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(i.to_f64().unwrap() == f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(f == i.to_f64().unwrap()))),
+                                    (KnownTerm::String(None), KnownTerm::String(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::String(Some(s1)), KnownTerm::String(Some(s2))) => Term::Known(KnownTerm::Bool(Some(s1 == s2))),
+                                    (KnownTerm::Bytes(None), KnownTerm::Bytes(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Bytes(Some(b1)), KnownTerm::Bytes(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 == b2))),
+                                    (KnownTerm::Tuple(None), KnownTerm::Tuple(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Tuple(Some(t1)), KnownTerm::Tuple(Some(t2))) => Term::Known(KnownTerm::Bool(Some(t1 == t2))),
+                                    (KnownTerm::Complex { real: None, imag: None }, KnownTerm::Complex { real: None, imag: None }) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Complex { real: Some(r1), imag: Some(i1) }, KnownTerm::Complex { real: Some(r2), imag: Some(i2) }) => Term::Known(KnownTerm::Bool(Some(r1 == r2 && i1 == i2))),
+                                    (KnownTerm::Class { .. }, x) => unimplemented!("Eq class for some type"),
+                                    (x, KnownTerm::Class { .. }) => unimplemented!("Eq class for some type"),
+                                    _ => return Err(String::from("Invalid type for binary ==")),
+
+                                };
+                                if !result.is_truthy(env) {
+                                    return Ok(Term::Known(KnownTerm::Bool(Some(false))));
+                                } else {
+                                    insert = result;
+                                }
+                            } else {
+                                return Ok(Term::Unknown);
+                            }
+                        } else {
+                            return Ok(Term::Unknown);
+                        }
+                    }
+                    CmpOp::NotEq => {
+                        if let Term::Known(a) = &comparators[0] {
+                            if let Term::Known(b) = &comparators[1] {
+                                let result = match (a,b) {
+                                    (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Bool(Some(i1 != i2))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(i != BigInt::from(1)))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(1) != i))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(i != BigInt::from(0)))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(0) != i))),
+                                    (KnownTerm::Bool(Some(b1)), KnownTerm::Bool(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 != b2))),
+                                    (KnownTerm::Float(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(Some(f1)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Bool(Some(f1 != f2))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(f != 1.0))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(1.0 != f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(f != 0.0))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(0.0 != f))),
+                                    (KnownTerm::Integer(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(i.to_f64().unwrap() != f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(f != i.to_f64().unwrap()))),
+                                    (KnownTerm::String(None), KnownTerm::String(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::String(Some(s1)), KnownTerm::String(Some(s2))) => Term::Known(KnownTerm::Bool(Some(s1 != s2))),
+                                    (KnownTerm::Bytes(None), KnownTerm::Bytes(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Bytes(Some(b1)), KnownTerm::Bytes(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 != b2))),
+                                    (KnownTerm::Tuple(None), KnownTerm::Tuple(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Tuple(Some(t1)), KnownTerm::Tuple(Some(t2))) => Term::Known(KnownTerm::Bool(Some(t1 != t2))),
+                                    (KnownTerm::Complex { real: None, imag: None }, KnownTerm::Complex { real: None, imag: None }) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Complex { real: Some(r1), imag: Some(i1) }, KnownTerm::Complex { real: Some(r2), imag: Some(i2) }) => Term::Known(KnownTerm::Bool(Some(r1 != r2 && i1 != i2))),
+                                    (KnownTerm::Class { .. }, x) => unimplemented!("Neq class for some type"),
+                                    (x, KnownTerm::Class { .. }) => unimplemented!("Neq class for some type"),
+                                    _ => return Err(String::from("Invalid type for binary !=")),
+
+                                };
+                                if !result.is_truthy(env) {
+                                    return Ok(Term::Known(KnownTerm::Bool(Some(false))));
+                                } else {
+                                    insert = result;
+                                }
+                            } else {
+                                return Ok(Term::Unknown);
+                            }
+                        } else {
+                            return Ok(Term::Unknown);
+                        }
+                    }
+                    CmpOp::Lt => {
+                        if let Term::Known(a) = &comparators[0] {
+                            if let Term::Known(b) = &comparators[1] {
+                                let result = match (a, b) {
+                                    (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Bool(Some(i1 < i2))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(i < &BigInt::from(1)))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(1) < i))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(i < &BigInt::from(0)))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(0) < i))),
+                                    (KnownTerm::Bool(Some(b1)), KnownTerm::Bool(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 < b2))),
+                                    (KnownTerm::Float(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(Some(f1)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Bool(Some(f1 < f2))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(*f < 1.0))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(1.0 < f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(*f < 0.0))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(0.0 < f))),
+                                    (KnownTerm::Integer(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(i.to_f64().unwrap() < f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(*f < i.to_f64().unwrap()))),
+                                    (KnownTerm::String(None), KnownTerm::String(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::String(Some(s1)), KnownTerm::String(Some(s2))) => Term::Known(KnownTerm::Bool(Some(s1 < s2))),
+                                    (KnownTerm::Bytes(None), KnownTerm::Bytes(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Bytes(Some(b1)), KnownTerm::Bytes(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 < b2))),
+                                    (KnownTerm::Tuple(None), KnownTerm::Tuple(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Tuple(Some(t1)), KnownTerm::Tuple(Some(t2))) => Term::Known(KnownTerm::Bool(Some(t1 < t2))),
+                                    (KnownTerm::Complex { real: None, imag: None }, KnownTerm::Complex { real: None, imag: None }) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Complex { real: Some(r1), imag: Some(i1) }, KnownTerm::Complex { real: Some(r2), imag: Some(i2) }) => Term::Known(KnownTerm::Bool(Some(r1 < r2 && i1 < i2))),
+                                    (KnownTerm::Class { .. }, x) => unimplemented!("Lt class for some type"),
+                                    (x, KnownTerm::Class { .. }) => unimplemented!("Lt class for some type"),
+                                    _ => return Err(String::from("Invalid type for binary <")),
+                                };
+                                if !result.is_truthy(env) {
+                                    return Ok(Term::Known(KnownTerm::Bool(Some(false))));
+                                } else {
+                                    insert = result;
+                                }
+                            } else {
+                                return Ok(Term::Unknown)
+                            }
+                        } else {
+                            return Ok(Term::Unknown)
+                        }
+                    }
+                    CmpOp::LtE => {
+                        if let Term::Known(a) = &comparators[0] {
+                            if let Term::Known(b) = &comparators[1] {
+                                let result = match (a,b) {
+                                    (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Bool(Some(i1 <= i2))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(i <= &BigInt::from(1)))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(1) <= i))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(i <= &BigInt::from(0)))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(0) <= i))),
+                                    (KnownTerm::Bool(Some(b1)), KnownTerm::Bool(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 <= b2))),
+                                    (KnownTerm::Float(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(Some(f1)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Bool(Some(f1 <= f2))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(*f <= 1.0))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(1.0 <= f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(*f <= 0.0))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(0.0 <= f))),
+                                    (KnownTerm::Integer(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(i.to_f64().unwrap() <= f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(*f <= i.to_f64().unwrap()))),
+                                    (KnownTerm::String(None), KnownTerm::String(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::String(Some(s1)), KnownTerm::String(Some(s2))) => Term::Known(KnownTerm::Bool(Some(s1 <= s2))),
+                                    (KnownTerm::Bytes(None), KnownTerm::Bytes(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Bytes(Some(b1)), KnownTerm::Bytes(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 <= b2))),
+                                    (KnownTerm::Tuple(None), KnownTerm::Tuple(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Tuple(Some(t1)), KnownTerm::Tuple(Some(t2))) => Term::Known(KnownTerm::Bool(Some(t1 <= t2))),
+                                    (KnownTerm::Complex { real: None, imag: None }, KnownTerm::Complex { real: None, imag: None }) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Complex { real: Some(r1), imag: Some(i1) }, KnownTerm::Complex { real: Some(r2), imag: Some(i2) }) => Term::Known(KnownTerm::Bool(Some(r1 <= r2 && i1 <= i2))),
+                                    (KnownTerm::Class { .. }, x) => unimplemented!("LtEq class for some type"),
+                                    (x, KnownTerm::Class { .. }) => unimplemented!("LtEq class for some type"),
+                                    _ => return Err(String::from("Invalid type for binary <=")),
+
+                                };
+                                if !result.is_truthy(env) {
+                                    return Ok(Term::Known(KnownTerm::Bool(Some(false))));
+                                } else {
+                                    insert = result;
+                                }
+                            } else {
+                                return Ok(Term::Unknown);
+                            }
+                        } else {
+                            return Ok(Term::Unknown);
+                        }
+                    }
+                    CmpOp::Gt => {
+                        if let Term::Known(a) = &comparators[0] {
+                            if let Term::Known(b) = &comparators[1] {
+                                let result = match (a, b) {
+                                    (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Bool(Some(i1 > i2))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(i > &BigInt::from(1)))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(1) > i))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(i > &BigInt::from(0)))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(0) > i))),
+                                    (KnownTerm::Bool(Some(b1)), KnownTerm::Bool(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 > b2))),
+                                    (KnownTerm::Float(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(Some(f1)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Bool(Some(f1 > f2))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(*f > 1.0))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(1.0 > f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(*f > 0.0))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(0.0 > f))),
+                                    (KnownTerm::Integer(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(i.to_f64().unwrap() > f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(*f > i.to_f64().unwrap()))),
+                                    (KnownTerm::String(None), KnownTerm::String(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::String(Some(s1)), KnownTerm::String(Some(s2))) => Term::Known(KnownTerm::Bool(Some(s1 > s2))),
+                                    (KnownTerm::Bytes(None), KnownTerm::Bytes(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Bytes(Some(b1)), KnownTerm::Bytes(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 > b2))),
+                                    (KnownTerm::Tuple(None), KnownTerm::Tuple(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Tuple(Some(t1)), KnownTerm::Tuple(Some(t2))) => Term::Known(KnownTerm::Bool(Some(t1 > t2))),
+                                    (KnownTerm::Complex { real: None, imag: None }, KnownTerm::Complex { real: None, imag: None }) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Complex { real: Some(r1), imag: Some(i1) }, KnownTerm::Complex { real: Some(r2), imag: Some(i2) }) => Term::Known(KnownTerm::Bool(Some(r1 > r2 && i1 > i2))),
+                                    (KnownTerm::Class { .. }, x) => unimplemented!("Gt class for some type"),
+                                    (x, KnownTerm::Class { .. }) => unimplemented!("Gt class for some type"),
+                                    _ => return Err(String::from("Invalid type for binary >")),
+                                };
+                                if !result.is_truthy(env) {
+                                    return Ok(Term::Known(KnownTerm::Bool(Some(false))));
+                                } else {
+                                    insert = result;
+                                }
+                            } else {
+                                return Ok(Term::Unknown)
+                            }
+                        } else {
+                            return Ok(Term::Unknown)
+                        };
+                    }
+                    CmpOp::GtE => {
+                        if let Term::Known(a) = &comparators[0] {
+                            if let Term::Known(b) = &comparators[1] {
+                                let result = match (a, b) {
+                                    (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Bool(Some(i1 >= i2))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(i >= &BigInt::from(1)))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(1) >= i))),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(i >= &BigInt::from(0)))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(&BigInt::from(0) >= i))),
+                                    (KnownTerm::Bool(Some(b1)), KnownTerm::Bool(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 >= b2))),
+                                    (KnownTerm::Float(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(Some(f1)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Bool(Some(f1 >= f2))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Bool(Some(*f >= 1.0))),
+                                    (KnownTerm::Bool(Some(true)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(1.0 >= f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Bool(Some(*f >= 0.0))),
+                                    (KnownTerm::Bool(Some(false)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(0.0 >= f))),
+                                    (KnownTerm::Integer(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Float(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Integer(Some(i)), KnownTerm::Float(Some(f))) => Term::Known(KnownTerm::Bool(Some(i.to_f64().unwrap() >= f))),
+                                    (KnownTerm::Float(Some(f)), KnownTerm::Integer(Some(i))) => Term::Known(KnownTerm::Bool(Some(*f >= i.to_f64().unwrap()))),
+                                    (KnownTerm::String(None), KnownTerm::String(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::String(Some(s1)), KnownTerm::String(Some(s2))) => Term::Known(KnownTerm::Bool(Some(s1 >= s2))),
+                                    (KnownTerm::Bytes(None), KnownTerm::Bytes(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Bytes(Some(b1)), KnownTerm::Bytes(Some(b2))) => Term::Known(KnownTerm::Bool(Some(b1 >= b2))),
+                                    (KnownTerm::Tuple(None), KnownTerm::Tuple(None)) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Tuple(Some(t1)), KnownTerm::Tuple(Some(t2))) => Term::Known(KnownTerm::Bool(Some(t1 >= t2))),
+                                    (KnownTerm::Complex { real: None, imag: None }, KnownTerm::Complex { real: None, imag: None }) => Term::Known(KnownTerm::Bool(None)),
+                                    (KnownTerm::Complex { real: Some(r1), imag: Some(i1) }, KnownTerm::Complex { real: Some(r2), imag: Some(i2) }) => Term::Known(KnownTerm::Bool(Some(r1 >= r2 && i1 >= i2))),
+                                    (KnownTerm::Class { .. }, x) => unimplemented!("Gt class for some type"),
+                                    (x, KnownTerm::Class { .. }) => unimplemented!("Gt class for some type"),
+                                    _ => return Err(String::from("Invalid type for binary >")),
+                                };
+                                if !result.is_truthy(env) {
+                                    return Ok(Term::Known(KnownTerm::Bool(Some(false))));
+                                } else {
+                                    insert = result;
+                                }
+                            } else {
+                                return Ok(Term::Unknown)
+                            }
+                        } else {
+                            return Ok(Term::Unknown)
+                        }
+                    }
+                    CmpOp::Is => unimplemented!("Is"),
+                    CmpOp::IsNot => unimplemented!("IsNot"),
+                    CmpOp::In => unimplemented!("In"),
+                    CmpOp::NotIn => unimplemented!("NotIn"),
+                }
+                ops.pop();
+
+                comparators = comparators.split_off(2);
+                if comparators.len() == 0 || !insert.is_truthy(env) {
+                    out = Ok(insert);
+                    break;
+                }
+                comparators.insert(0, insert);
+            }
+            return out;
+        },
+        Expr::Call(ExprCall {func, args, keywords, ..}) => {
+            let func = infer_type_expr(func, env)?;
+            if let Term::Known(func) = func {
+                match func {
+                    KnownTerm::Function {..} => unimplemented!("Call function"),
+                    _ => return Err(String::from("Cannot call non-function")
+                }
+
+            } else {
+                Ok(Term::Unknown)
+            }
+        }
     }
 
 }

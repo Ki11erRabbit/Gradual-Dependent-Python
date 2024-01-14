@@ -347,13 +347,221 @@ pub fn infer_type_expr<R>(ast: &Expr<R>, env: &mut Environment) -> Result<Term,S
                     }
 
                 }
-                Operator::Mod => {}
-                Operator::Pow => {}
-                Operator::LShift => {}
-                Operator::RShift => {}
-                Operator::BitOr => {}
-                Operator::BitXor => {}
-                Operator::BitAnd => {}
+                Operator::Mod => {
+                    return if let Term::Known(known1) = left {
+                        if let Term::Known(known2) = right {
+                            let result = match (known1, known2) {
+                                (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Float(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Integer(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Float(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Integer(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Float(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) if i2 != BigInt::from(0) => Term::Known(KnownTerm::Float(Some(i1.to_f64().unwrap() % i2.to_f64().unwrap()))),
+                                (KnownTerm::Integer(Some(_)), KnownTerm::Integer(Some(i2))) if i2 == BigInt::from(0) => return Err(String::from("Division by zero")),
+                                (KnownTerm::Float(Some(f1)), KnownTerm::Float(Some(f2))) if f2 != 0.0 => Term::Known(KnownTerm::Float(Some(f1 % f2))),
+                                (KnownTerm::Float(Some(_)), KnownTerm::Float(Some(f2))) if f2 == 0.0 => return Err(String::from("Division by zero")),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Float(Some(f2))) if f2 != 0.0 => Term::Known(KnownTerm::Float(Some(i1.to_f64().unwrap() % f2))),
+                                (KnownTerm::Integer(Some(_)), KnownTerm::Float(Some(f2))) if f2 == 0.0 => return Err(String::from("Division by zero")),
+                                (KnownTerm::Float(Some(f1)), KnownTerm::Integer(Some(i2))) if i2 != BigInt::from(0) => Term::Known(KnownTerm::Float(Some(f1 % i2.to_f64().unwrap()))),
+                                (KnownTerm::Float(Some(_)), KnownTerm::Integer(Some(i2))) if i2 == BigInt::from(0) => return Err(String::from("Division by zero")),
+                                (KnownTerm::Integer(Some(_)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Float(Some(0.0))),
+                                (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Float(Some(1.0 % i2.to_f64().unwrap()))),
+                                (KnownTerm::Integer(Some(_)), KnownTerm::Bool(Some(false))) => return Err(String::from("Division by zero")),
+                                (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(_))) => Term::Known(KnownTerm::Float(Some(0.0))),
+                                (KnownTerm::Float(Some(_)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Float(Some(0.0))),
+                                (KnownTerm::Bool(Some(true)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Float(Some(1.0 % f2))),
+                                (KnownTerm::Float(Some(_)), KnownTerm::Bool(Some(false))) => return Err(String::from("Division by zero")),
+                                (KnownTerm::Bool(Some(false)), KnownTerm::Float(Some(_))) => Term::Known(KnownTerm::Float(Some(0.0))),
+                                (KnownTerm::Complex { real: None, imag: None }, KnownTerm::Complex { real: None, imag: None }) => Term::Known(KnownTerm::Complex { real: None, imag: None }),
+                                (KnownTerm::Complex { real: Some(r1), imag: Some(i1) }, KnownTerm::Complex { real: Some(r2), imag: Some(i2) }) if r2 != 0.0 && i2 != 0.0 => Term::Known(KnownTerm::Complex { real: Some(r1 % r2), imag: Some(i1 % i2) }),
+                                (KnownTerm::Complex { real: Some(_), imag: Some(_) }, KnownTerm::Complex { real: Some(r2), imag: Some(i2) }) if r2 == 0.0 || i2 == 0.0 => return Err(String::from("Division by zero")),
+                                (KnownTerm::Class { .. }, x) => unimplemented!("Mod class for some type"),
+                                (x, KnownTerm::Class { .. }) => unimplemented!("Mod class for some type"),
+                                _ => return Err(String::from("Invalid type for binary %")),
+                            };
+                            Ok(result)
+                        } else {
+                            Ok(Term::Unknown)
+                        }
+                    } else {
+                        Ok(Term::Unknown)
+                    }
+
+                }
+                Operator::Pow => {
+                    return if let Term::Known(known1) = left {
+                        if let Term::Known(known2) = right {
+                            let result = match (known1, known2) {
+                                (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Float(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Integer(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Float(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Integer(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Float(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Float(None)) => Term::Known(KnownTerm::Float(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(i1.pow(u32::try_from(i2).unwrap())))),
+                                (KnownTerm::Float(Some(f1)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Float(Some(f1.pow(f2)))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Float(Some(i1.to_f64().unwrap().pow(f2)))),
+                                (KnownTerm::Float(Some(f1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Float(Some(f1.pow(i2.to_f64().unwrap())))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Integer(Some(i1))),
+                                (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(1)))),
+                                (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(1)))),
+                                (KnownTerm::Float(Some(f1)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Float(Some(f1))),
+                                (KnownTerm::Bool(Some(true)), KnownTerm::Float(Some(f2))) => Term::Known(KnownTerm::Float(Some(BigInt::from(1).to_f64().unwrap().pow(f2)))),
+                                (KnownTerm::Float(Some(_)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Float(Some(1.0))),
+                                (KnownTerm::Bool(Some(false)), KnownTerm::Float(Some(_))) => Term::Known(KnownTerm::Float(Some(0.0))),
+                                (KnownTerm::Complex { real: None, imag: None }, KnownTerm::Complex { real: None, imag: None }) => Term::Known(KnownTerm::Complex { real: None, imag: None }),
+                                (KnownTerm::Complex { real: Some(r1), imag: Some(i1) }, KnownTerm::Complex { real: Some(r2), imag: Some(i2) }) => Term::Known(KnownTerm::Complex { real: Some(r1.pow(r2)), imag: Some(i1.pow(i2)) }),
+                                (KnownTerm::Class { .. }, x) => unimplemented!("Multiply class for some type"),
+                                (x, KnownTerm::Class { .. }) => unimplemented!("Multiply class for some type"),
+                                _ => return Err(String::from("Invalid type for binary *")),
+                            };
+                            Ok(result)
+                        } else {
+                            Ok(Term::Unknown)
+                        }
+                    } else {
+                        Ok(Term::Unknown)
+                    }
+
+                }
+                Operator::LShift => {
+                    return if let Term::Known(known1) = left {
+                        if let Term::Known(known2) = right {
+                            let result = match (known1, known2) {
+                                (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(i1 << i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Integer(Some(i1 << BigInt::from(1)))),
+                                (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(1) << i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Integer(Some(i1 << BigInt::from(0)))),
+                                (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(0) << i2))),
+                                (KnownTerm::Class { .. }, x) => unimplemented!("LShift class for some type"),
+                                (x, KnownTerm::Class { .. }) => unimplemented!("LShift class for some type"),
+                                _ => return Err(String::from("Invalid type for binary <<")),
+                            };
+                            Ok(result)
+                        } else {
+                            Ok(Term::Unknown)
+                        }
+                    } else {
+                        Ok(Term::Unknown)
+                    }
+
+                }
+                Operator::RShift => {
+                    return if let Term::Known(known1) = left {
+                        if let Term::Known(known2) = right {
+                            let result = match (known1, known2) {
+                                (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(i1 >> i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Integer(Some(i1 >> BigInt::from(1)))),
+                                (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(1) >> i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Integer(Some(i1 >> BigInt::from(0)))),
+                                (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(0) >> i2))),
+                                (KnownTerm::Class { .. }, x) => unimplemented!("RShift class for some type"),
+                                (x, KnownTerm::Class { .. }) => unimplemented!("RShift class for some type"),
+                                _ => return Err(String::from("Invalid type for binary >>")),
+                            };
+                            Ok(result)
+                        } else {
+                            Ok(Term::Unknown)
+                        }
+                    } else {
+                        Ok(Term::Unknown)
+                    }
+
+                }
+                Operator::BitOr => {
+                    return if let Term::Known(known1) = left {
+                        if let Term::Known(known2) = right {
+                            let result = match (known1, known2) {
+                                (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(i1 | i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Integer(Some(i1 | BigInt::from(1)))),
+                                (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(1) | i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Integer(Some(i1 | BigInt::from(0)))),
+                                (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(0) | i2))),
+                                (KnownTerm::Class { .. }, x) => unimplemented!("BitOr class for some type"),
+                                (x, KnownTerm::Class { .. }) => unimplemented!("BitOr class for some type"),
+                                _ => return Err(String::from("Invalid type for binary |")),
+                            };
+                            Ok(result)
+                        } else {
+                            Ok(Term::Unknown)
+                        }
+                    } else {
+                        Ok(Term::Unknown)
+                    }
+
+                }
+                Operator::BitXor => {
+                    return if let Term::Known(known1) = left {
+                        if let Term::Known(known2) = right {
+                            let result = match (known1, known2) {
+                                (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(i1 ^ i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Integer(Some(i1 ^ BigInt::from(1)))),
+                                (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(1) ^ i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Integer(Some(i1 ^ BigInt::from(0)))),
+                                (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(0) ^ i2))),
+                                (KnownTerm::Class { .. }, x) => unimplemented!("BitXor class for some type"),
+                                (x, KnownTerm::Class { .. }) => unimplemented!("BitXor class for some type"),
+                                _ => return Err(String::from("Invalid type for binary ^")),
+                            };
+                            Ok(result)
+                        } else {
+                            Ok(Term::Unknown)
+                        }
+                    } else {
+                        Ok(Term::Unknown)
+                    }
+
+                }
+                Operator::BitAnd => {
+                    return if let Term::Known(known1) = left {
+                        if let Term::Known(known2) = right {
+                            let result = match (known1, known2) {
+                                (KnownTerm::Integer(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Integer(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Bool(None), KnownTerm::Bool(None)) => Term::Known(KnownTerm::Integer(None)),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(i1 & i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(true))) => Term::Known(KnownTerm::Integer(Some(i1 & BigInt::from(1)))),
+                                (KnownTerm::Bool(Some(true)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(1) & i2))),
+                                (KnownTerm::Integer(Some(i1)), KnownTerm::Bool(Some(false))) => Term::Known(KnownTerm::Integer(Some(i1 & BigInt::from(0)))),
+                                (KnownTerm::Bool(Some(false)), KnownTerm::Integer(Some(i2))) => Term::Known(KnownTerm::Integer(Some(BigInt::from(0) & i2))),
+                                (KnownTerm::Class { .. }, x) => unimplemented!("BitOr class for some type"),
+                                (x, KnownTerm::Class { .. }) => unimplemented!("BitOr class for some type"),
+                                _ => return Err(String::from("Invalid type for binary |")),
+                            };
+                            Ok(result)
+                        } else {
+                            Ok(Term::Unknown)
+                        }
+                    } else {
+                        Ok(Term::Unknown)
+                    }
+
+                }
                 Operator::FloorDiv => {
                     return if let Term::Known(known1) = left {
                         if let Term::Known(known2) = right {

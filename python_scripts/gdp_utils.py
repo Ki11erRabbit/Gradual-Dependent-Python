@@ -658,3 +658,262 @@ def zip(*iterables, strict=False):
     else:
         return old_zip(*iterables)
 
+class sharedint:
+    def __init__(self, value:int = 0):
+        self.value = value
+
+    def increment(self):
+        self.value += 1
+
+class failedvalue(Exception):
+    def __init__(self, message="failed due to previous computation failing"):
+        super().__init__(message)
+
+    @staticmethod
+    def fail():
+        raise failedvalue("failed due to previous computation failing")
+    def __repr__(self):
+        failedvalue.fail()
+
+    def __str__(self):
+        failedvalue.fail()
+
+    def __eq__(self, other):
+        failedvalue.fail()
+
+    def __ne__(self, other):
+        failedvalue.fail()
+
+    def __lt__(self, other):
+        failedvalue.fail()
+
+    def __le__(self, other):
+        failedvalue.fail()
+
+    def __gt__(self, other):
+        failedvalue.fail()
+
+    def __ge__(self, other):
+        failedvalue.fail()
+
+    def __hash__(self):
+        failedvalue.fail()
+
+    def __bool__(self):
+        failedvalue.fail()
+
+    def __add__(self, other):
+        failedvalue.fail()
+
+    def __radd__(self, other):
+        failedvalue.fail()
+
+    def __sub__(self, other):
+        failedvalue.fail()
+
+    def __rsub__(self, other):
+        failedvalue.fail()
+
+    def __mul__(self, other):
+        failedvalue.fail()
+
+    def __rmul__(self, other):
+        failedvalue.fail()
+
+    def __truediv__(self, other):
+        failedvalue.fail()
+
+    def __rtruediv__(self, other):
+        failedvalue.fail()
+
+    def __floordiv__(self, other):
+        failedvalue.fail()
+
+    def __rfloordiv__(self, other):
+        failedvalue.fail()
+
+    def __mod__(self, other):
+        failedvalue.fail()
+
+    def __rmod__(self, other):
+        failedvalue.fail()
+
+    def __pow__(self, other):
+        failedvalue.fail()
+
+    def __rpow__(self, other):
+        failedvalue.fail()
+
+    def __lshift__(self, other):
+        failedvalue.fail()
+
+    def __rlshift__(self, other):
+        failedvalue.fail()
+
+    def __rshift__(self, other):
+        failedvalue.fail()
+
+    def __rrshift__(self, other):
+        failedvalue.fail()
+
+    def __and__(self, other):
+        failedvalue.fail()
+
+    def __rand__(self, other):
+        failedvalue.fail()
+
+    def __xor__(self, other):
+        failedvalue.fail()
+
+    def __rxor__(self, other):
+        failedvalue.fail()
+
+    def __or__(self, other):
+        failedvalue.fail()
+
+    def __ror__(self, other):
+        failedvalue.fail()
+
+    def __iadd__(self, other):
+        failedvalue.fail()
+
+    def __neg__(self):
+        failedvalue.fail()
+
+    def __pos__(self):
+        failedvalue.fail()
+
+    def __abs__(self):
+        failedvalue.fail()
+
+    def __invert__(self):
+        failedvalue.fail()
+
+    def __round__(self, n=None):
+        failedvalue.fail()
+
+    def __floor__(self):
+        failedvalue.fail()
+
+    def __ceil__(self):
+        failedvalue.fail()
+
+    def __trunc__(self):
+        failedvalue.fail()
+
+    def __int__(self):
+        failedvalue.fail()
+
+    def __float__(self):
+        failedvalue.fail()
+
+    def __complex__(self):
+        failedvalue.fail()
+
+    def __oct__(self):
+        failedvalue.fail()
+
+    def __hex__(self):
+        failedvalue.fail()
+
+    def __index__(self):
+        failedvalue.fail()
+
+    def __len__(self):
+        failedvalue.fail()
+
+    def __getitem__(self, key):
+        failedvalue.fail()
+
+    def __setitem__(self, key, value):
+        failedvalue.fail()
+
+    def __delitem__(self, key):
+        failedvalue.fail()
+
+    def __iter__(self):
+        failedvalue.fail()
+
+    def __next__(self):
+        failedvalue.fail()
+
+    def __reversed__(self):
+        failedvalue.fail()
+
+    def __contains__(self, item):
+        failedvalue.fail()
+
+    def __enter__(self):
+        failedvalue.fail()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        failedvalue.fail()
+
+    def __call__(self, *args, **kwargs):
+        failedvalue.fail()
+
+    def __getattr__(self, item):
+        failedvalue.fail()
+
+    def __setattr__(self, key, value):
+        failedvalue.fail()
+
+    def __delattr__(self, item):
+        failedvalue.fail()
+
+    def __copy__(self):
+        failedvalue.fail()
+
+    def __deepcopy__(self, memodict={}):
+        failedvalue.fail()
+
+    def __getstate__(self):
+        failedvalue.fail()
+
+    def __setstate__(self, state):
+        failedvalue.fail()
+
+    def __reduce__(self):
+        failedvalue.fail()
+
+    def __reduce_ex__(self, protocol):
+        failedvalue.fail()
+
+    def __format__(self, format_spec):
+        failedvalue.fail()
+
+    def __get__(self, instance, owner):
+        failedvalue.fail()
+
+    def __set__(self, instance, value):
+        failedvalue.fail()
+
+    def __delete__(self, instance):
+        failedvalue.fail()
+
+    def __sizeof__(self):
+        failedvalue.fail()
+
+
+
+def check(expr: str, universe: str, current_sub_path: sharedint, globals=globals(), locals=locals()):
+    current = current_sub_path.value
+    current_sub_path.increment()
+    try:
+        return eval(expr, globals, locals)
+    except TypeShapeError as e:
+        print(f"Path {universe}.{str(current)} failed with a ShapeError saying:")
+        print(e)
+        return failedvalue()
+    except TypeError as e:
+        print(f"Path {universe}.{str(current)} failed with a TypeError saying:")
+        print(e)
+        return failedvalue()
+    except AttributeError as e:
+        print(f"Path {universe}.{str(current)} failed with an AttributeError saying:")
+        print(e)
+        return failedvalue()
+    except failedvalue:
+        print(f"Path {universe}.{str(current)} failed with a failedvalue exception")
+        return failedvalue()
+

@@ -582,7 +582,7 @@ class DependentType:
         elif isinstance(self.value, object):
             return f"({self.value})"
         else:
-            return type(self.value).__class__
+            return type(self.value).__name__
 
     @staticmethod
     def from_value(value, var_name):
@@ -612,6 +612,7 @@ class DependentType:
             return
 
         if type(locals[var_name]).__name__ != self.type_name:
+            print(f"Value {type(locals[var_name]).__name__} is not of type {self.type_name}")
             raise DependentTypeError(f"Value {locals[var_name]} is not beta-eta reducible to {self.type_name}")
         if self.where_clauses is not None:
             for clause in self.where_clauses:

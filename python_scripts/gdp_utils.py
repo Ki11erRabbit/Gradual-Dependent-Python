@@ -498,8 +498,8 @@ class DependentType:
         out += ")"
         return out
 
-    def format_value(self):
-        parents = []
+    def format_value(self,parents=[]):
+
         def list_printer(x):
             parents.append(x)
             output = "["
@@ -507,9 +507,9 @@ class DependentType:
                 if i != 0:
                     output += ", "
                 if item in parents:
-                    output += "self"
+                    output += "[...]"
                     continue
-                output += type_printer(item)
+                output += self.format_value(item)
             output += "]"
             parents.pop()
             return output
@@ -521,9 +521,9 @@ class DependentType:
                 if i != 0:
                     output += ", "
                 if item in parents:
-                    output += "self"
+                    output += "(...)"
                     continue
-                output += type_printer(item)
+                output += self.format_value(item)(item)
             output += ")"
             parents.pop()
             return output
@@ -535,11 +535,11 @@ class DependentType:
                 if i != 0:
                     output += ", "
                 if item in parents:
-                    output += "self"
+                    output += "{...}"
                     continue
-                output += type_printer(item)
+                output += self.format_value(item)(item)
                 output += ": "
-                output += type_printer(x[item])
+                output += self.format_value(item)(x[item])
             output += "}"
             parents.pop()
             return output
@@ -551,9 +551,9 @@ class DependentType:
                 if i != 0:
                     output += ", "
                 if item in parents:
-                    output += "self"
+                    output += "{...}"
                     continue
-                output += type_printer(item)
+                output += self.format_value(item)(item)
             output += "}"
             parents.pop()
             return output
@@ -637,8 +637,13 @@ class Function:
         self.return_type = return_type
 
     def __call__(self, *args, **kwargs):
+
+        arguments = {}
         for i, arg in enumerate(args):
-            self.argument_types[i].check_value({self.argument_types[i].var_name: arg}, self.argument_types[i].var_name)
+            arguments[self.argument_types[i].var_name] = arg
+
+        for i, arg in enumerate(args):
+            self.argument_types[i].check_value(arguments, self.argument_types[i].var_name)
 
         for kwarg in kwargs:
             self.keyword_argument_types[kwarg].check_value({kwarg: kwargs[kwarg]}, kwarg)

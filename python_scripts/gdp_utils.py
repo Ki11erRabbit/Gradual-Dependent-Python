@@ -148,7 +148,6 @@ class UnknownTerm:
     def __hex__(self):
         return self
 
-
     def __index__(self):
         return self
 
@@ -232,7 +231,7 @@ class UnknownTerm:
 
 
 
-class TypeShapeError(Exception):
+class DependentTypeError(TypeError):
     def __init__(self, message):
         super().__init__(message)
 
@@ -475,7 +474,7 @@ class failedvalue(Exception):
 
 
 class DependentType:
-    def __init__(self, type_name, value=None, var_name=None, where_clauses=None, has_clauses=None, when_clauses=None):
+    def __init__(self, type_name, var_name, value=None, where_clauses=None, has_clauses=None, when_clauses=None):
         self.type_name = type_name
         self.value = value
         self.var_name = var_name
@@ -488,17 +487,17 @@ class DependentType:
         if self.value is not None:
             out += f"({self.format_value()}"
         if self.where_clauses is not None:
-            out += map(self.has_clauses, lambda x: "where " + x).join(" | ")
+            out += " | ".join(map(lambda x: "where " + x, self.has_clauses))
         if self.has_clauses is not None:
             out += "has " + self.has_clauses.__repr__()
         if self.when_clauses is not None:
-            out += map(self.has_clauses, lambda x: "when " + x).join(" | ")
+            out += " | ".join(map(lambda x: "when " + x, self.has_clauses))
 
 
         out += ")"
         return out
 
-    def format_value(self,parents=[]):
+    def format_value(self, parents=[]):
 
         def list_printer(x):
             parents.append(x)
@@ -574,7 +573,7 @@ class DependentType:
             return f"({set_printer(list(self.value))})"
         elif isinstance(self.value, bool):
             return f"({self.value})"
-        elif isinstance(self.value, compleself.value):
+        elif isinstance(self.value, complex):
             return f"({self.value})"
         elif isinstance(self.value, bytes):
             return f"({self.value})"
@@ -586,42 +585,43 @@ class DependentType:
             return type(self.value).__class__
 
     @staticmethod
-    def from_value(value):
-        return DependentType(type(value).__name__, value)
+    def from_value(value, var_name):
+        return DependentType(type(value).__name__, var_name, value)
 
     @staticmethod
-    def from_type(type):
-        return DependentType(type.__name__)
+    def from_type(type, var_name):
+        return DependentType(type.__name__, var_name)
 
     @staticmethod
-    def from_where_clauses(type_name, *where_clauses):
-        return DependentType(type_name, where_clauses=where_clauses)
+    def from_where_clauses(type_name, var_name, *where_clauses):
+        return DependentType(type_name, var_name, where_clauses=where_clauses)
 
     @staticmethod
-    def from_has_clauses(type_name, *has_clauses):
-        return DependentType(type_name, has_clauses=has_clauses)
+    def from_has_clauses(type_name, var_name, *has_clauses):
+        return DependentType(type_name, var_name, has_clauses=has_clauses)
 
     @staticmethod
-    def from_when_clauses(type_name, *when_clauses):
-        return DependentType(type_name, when_clauses=when_clauses)
+    def from_when_clauses(type_name, var_name, *when_clauses):
+        return DependentType(type_name, var_name, when_clauses=when_clauses)
 
-    def check_value(self, locals, var_name):
-        if isinstance(value, UnknownTerm):
+    def is_reducible(self, locals, var_name):
+        if isinstance(locals[var_name], UnknownTerm):
             return
 
-        if self.type_name == 'Any' and where_clauses is None and has_clauses is None and when_clauses is None:
+        if self.type_name == 'Any' and self.where_clauses is None and self.has_clauses is None and self.when_clauses is None:
             return
 
         if type(locals[var_name]).__name__ != self.type_name:
-            raise TypeError(f"Value {value} is not of type {self.type_name}")
+            raise DependentTypeError(f"Value {locals[var_name]} is not beta-eta reducible to {self.type_name}")
+        if self.where_clauses is not None:
+            for clause in self.where_clauses:
+                if not eval(clause, None, locals):
+                    raise DependentTypeError(f"Value {locals[var_name]} is not beta-eta reducible to {self.type_name} {clause}")
 
-        for clause in self.where_clauses:
-            if not eval(clause, None, locals):
-                raise TypeShapeError(f"Value {value} does not satisfy where clause {clause}")
-
-        for clause in self.has_clauses:
-            if not hasattr(value, clause):
-                raise TypeShapeError(f"Value {value} does not have attribute {clause}")
+        if self.has_clauses is not None:
+            for clause in self.has_clauses:
+                if not hasattr(locals[var_name], clause):
+                    raise DependentTypeError(f"Value {locals[var_name]} is not beta-eta reducible to {self.type_name} {clause}")
 
         #TODO: implement when clauses
 
@@ -642,14 +642,18 @@ class Function:
         for i, arg in enumerate(args):
             arguments[self.argument_types[i].var_name] = arg
 
+        for kwarg in kwargs:
+            arguments[kwarg] = kwargs[kwarg]
+
         for i, arg in enumerate(args):
-            self.argument_types[i].check_value(arguments, self.argument_types[i].var_name)
+            self.argument_types[i].is_reducible(arguments, self.argument_types[i].var_name)
 
         for kwarg in kwargs:
-            self.keyword_argument_types[kwarg].check_value({kwarg: kwargs[kwarg]}, kwarg)
+            self.keyword_argument_types[kwarg].check_value(arguments, kwarg)
 
         return_value = self.function(*args, **kwargs)
-        self.return_type.check_value(locals={self.name: return_value}, var_name=self.name)
+        arguments[self.name] = return_value
+        self.return_type.is_reducible(locals=arguments, var_name=self.name)
         return return_value
 
 
@@ -660,8 +664,8 @@ def check(expr: str, path: str, current_sub_path: sharedint, globals=globals(), 
     current_sub_path.increment()
     try:
         return eval(expr, globals, locals)
-    except TypeShapeError as e:
-        print(f"Path {path}.{str(current)} failed with a ShapeError saying:")
+    except DependentTypeError as e:
+        print(f"Path {path}.{str(current)} failed with a DependentTypeError saying:")
         print(e)
         return failedvalue()
     except TypeError as e:

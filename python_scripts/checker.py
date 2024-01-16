@@ -3,10 +3,6 @@ import random as rand
 from type_printer import type_printer
 
 def quicksort(x):
-    #return UnknownTerm()
-    if isinstance(x, UnknownTerm):
-        return UnknownTerm()
-    raise TypeShapeError("Test")
     if len(x) <= 1:
         return x
     else:
@@ -23,33 +19,28 @@ def quicksort(x):
         return quicksort(less) + [pivot] + quicksort(greater)
 
 
-x = [5,3,2,1,4]
+def make_even(x: int) -> int:
+    return x + 1
+
+def check_quicksort(path):
+    global quicksort
+    quicksort = Function(quicksort, "quicksort", [DependentType.from_type(list, "x")], {}, DependentType.from_type(list, "quicksort"))
+    x = [5, 3, 2, 1, 4]
+
+    result = check("quicksort(x)", path, sharedint(0), globals=globals(), locals=locals())
+    print(result)
+
+
+def check_make_even(path):
+    global make_even
+    make_even = Function(make_even, "make_even", [DependentType.from_where_clauses("int", "x", "x % 2 != 0")], {}, DependentType.from_where_clauses("int", "x % 2 == 0"))
+    x = 4
+
+    result = check("make_even(x)", path, sharedint(0), globals=globals(), locals=locals())
+    print(result)
 
 
 
+check_quicksort("0")
 
-current_sub_path = sharedint(0)
-result = check("quicksort(x)", "1", current_sub_path, globals=globals(), locals=locals())
-print("result is", result)
-
-
-
-type_printer(1)
-type_printer(1.0)
-type_printer("1")
-type_printer([1,2,3])
-type_printer((1,2,3))
-type_printer({1:2, 3:4})
-type_printer({1,2,3})
-type_printer(True)
-type_printer(complex(1,2))
-type_printer(bytes(1))
-type_printer(bytearray(1))
-type_printer(range(1))
-type_printer(slice(1))
-type_printer(type(1))
-type_printer(Exception())
-type_printer(object())
-type_printer(UnknownTerm())
-type_printer(failedvalue())
-type_printer(type_printer)
+check_make_even("1")

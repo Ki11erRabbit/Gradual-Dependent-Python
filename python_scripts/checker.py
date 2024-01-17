@@ -1,6 +1,5 @@
-from gdp_utils import *
+from gdp_typecheck_utils import *
 import random as rand
-from type_printer import type_printer
 
 def quicksort(x):
     if len(x) <= 1:
@@ -37,7 +36,7 @@ def check_quicksort(path):
     quicksort = Function(quicksort, "quicksort", [DependentType.from_type(list, "x")], {}, DependentType.from_type(list, "quicksort"))
     x = [5, 3, 2, 1, 4]
 
-    result = check("quicksort(x)", path, sharedint(0), globals=globals(), locals=locals())
+    result = check("quicksort(x)", path, SharedInt(0), globals=globals(), locals=locals())
     print(result)
 
 
@@ -46,7 +45,7 @@ def check_make_even(path):
     make_even = Function(make_even, "make_even", [DependentType.from_where_clauses("int", "x", "x % 2 != 0")], {}, DependentType.from_where_clauses("int", "x % 2 == 0"))
     x = 5
 
-    result = check("make_even(x)", path, sharedint(0), globals=globals(), locals=locals())
+    result = check("make_even(x)", path, SharedInt(0), globals=globals(), locals=locals())
     print(result)
 
 
@@ -56,7 +55,7 @@ def check_mat_mul(path):
     x = [[1, 2, 3], [4, 5, 6]]
     y = [[7, 8], [9, 10], [11, 12]]
 
-    result = check("mat_mult(x, y)", path, sharedint(0), globals=globals(), locals=locals())
+    result = check("mat_mult(x, y)", path, SharedInt(0), globals=globals(), locals=locals())
     print(result)
 
 

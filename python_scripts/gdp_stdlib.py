@@ -1,3 +1,4 @@
+from gdp_typecheck_utils import *
 def abs(x):
     # (int) -> int
     # (float) -> float
@@ -5,7 +6,7 @@ def abs(x):
     if isinstance(x, UnknownTerm):
         return UnknownTerm()
     elif '__abs__' not in dir(x):
-        raise TypeShapeError("object has no attribute '__abs__'")
+        raise DependentTypeError("object has no attribute '__abs__'")
     else:
         return x.__abs__()
 
@@ -15,6 +16,8 @@ def all(x):
     # (has '__bool__') -> bool
     if isinstance(x, UnknownTerm):
         return UnknownTerm()
+    elif '__total__' not in dir(x):
+        return UnknownTerm()
     return old_all(x)
 
 old_any = any
@@ -22,6 +25,8 @@ def any(x):
     # (list) -> bool
     # (has '__bool__') -> bool
     if isinstance(x, UnknownTerm):
+        return UnknownTerm()
+    elif '__total__' not in dir(x):
         return UnknownTerm()
     return old_any(x)
 
@@ -126,6 +131,8 @@ def enumerate(x, start=0):
     # (list) -> list
     if isinstance(x, UnknownTerm) or isinstance(start, UnknownTerm):
         return UnknownTerm()
+    elif '__total__' not in dir(x):
+        return (UnknownTerm(), UnknownTerm())
     elif '__iter__' not in dir(x) and '__next__' not in dir(x):
         raise AttributeError("object has no attribute '__iter__' or '__next__'")
     else:
@@ -150,6 +157,8 @@ old_filter = filter
 def filter(function, iterable):
     # (function, list) -> list
     if isinstance(function, UnknownTerm) or isinstance(iterable, UnknownTerm):
+        return UnknownTerm()
+    elif '__total__' not in dir(iterable):
         return UnknownTerm()
     elif '__iter__' not in dir(iterable) and '__next__' not in dir(iterable):
         raise AttributeError("object has no attribute '__iter__' or '__next__'")
@@ -246,6 +255,8 @@ def len(x):
     # (list) -> int
     if isinstance(x, UnknownTerm):
         return UnknownTerm()
+    elif '__total__' not in dir(x):
+        return UnknownTerm()
     elif '__len__' not in dir(x):
         raise AttributeError("object has no attribute '__len__'")
     else:
@@ -259,18 +270,25 @@ def list(x):
     elif '__iter__' not in dir(x) and '__next__' not in dir(x):
         raise AttributeError("object has no attribute '__iter__' or '__next__'")
     else:
-        return old_list(x)
+        l = old_list(x)
+        setattr(l, '__total__', True)
+        return l
 
 old_map = map
 def map(function, iterable, *iterables):
     # (function, list) -> list
     if isinstance(function, UnknownTerm) or isinstance(iterable, UnknownTerm) or isinstance(iterables, UnknownTerm):
         return UnknownTerm()
+    elif '__total__' not in dir(iterable):
+        return UnknownTerm()
     elif '__iter__' not in dir(iterable) and '__next__' not in dir(iterable):
         raise AttributeError("object has no attribute '__iter__' or '__next__'")
     elif '__call__' not in dir(function):
         raise AttributeError("object has no attribute '__call__'")
     else:
+        for i in iterables:
+            if '__total__' not in dir(i):
+                return UnknownTerm()
         return old_map(function, iterable, *iterables)
 
 #todo: max and min
@@ -310,7 +328,7 @@ def ord(x):
     elif not isinstance(x, str):
         raise TypeError("ord() expected string of length 1, but {} found".format(type(x)))
     elif len(x) != 1:
-        raise TypeShapeError("ord() expected string of length 1, but string of length {} found".format(len(x)))
+        raise DependentTypeError("ord() expected string of length 1, but string of length {} found".format(len(x)))
     else:
         return old_ord(x)
 
@@ -328,9 +346,13 @@ def range(start, stop=None, step=1):
     if isinstance(start, UnknownTerm) or isinstance(stop, UnknownTerm) or isinstance(step, UnknownTerm):
         return UnknownTerm()
     elif stop is None:
-        return old_range(start)
+        r = old_range(start)
+        setattr(r, '__total__', True)
+        return r
     else:
-        return old_range(start, stop, step)
+        r = old_range(start, stop, step)
+        setattr(r, '__total__', True)
+        return r
 
 old_repr = repr
 def repr(x):
@@ -373,6 +395,8 @@ def sorted(x, /, *, key=None, reverse=False):
     # (list) -> list
     if isinstance(x, UnknownTerm) or isinstance(key, UnknownTerm) or isinstance(reverse, UnknownTerm):
         return UnknownTerm()
+    elif '__total__' not in dir(x):
+        return UnknownTerm()
     elif '__iter__' not in dir(x) and '__next__' not in dir(x):
         raise AttributeError("object has no attribute '__iter__' or '__next__'")
     elif key is None:
@@ -394,6 +418,8 @@ old_sum = sum
 def sum(x, /, start=0):
     # (list) -> int | float
     if isinstance(x, UnknownTerm) or isinstance(start, UnknownTerm):
+        return UnknownTerm()
+    elif '__total__' not in dir(x):
         return UnknownTerm()
     elif '__iter__' not in dir(x) and '__next__' not in dir(x):
         raise AttributeError("object has no attribute '__iter__' or '__next__'")

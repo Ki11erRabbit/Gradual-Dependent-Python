@@ -31,29 +31,26 @@ def safe_div(x: int, y: int where y != 0) -> float:
 ```
 ##### Output When Gradual Normalization returns the Unknown Type
 ```python
+import gdp_runtime_utils as gdp
 def safe_div(x: int, y: int) -> float:
-    if not isinstance(x, int) and not isinstance(y, int):
-        raise TypeError("x, y must be of type int")
-    if not (y != 0):
-        raise ShapeError("y != 0 not satisfied")
-    __function_output__ = x / y
-    if not isinstance(__function_output__, float):
-        raise TypeError("return value must be of type float")
-    return __function_output__
+    return x / y
+
+# Call Site
+global safe_div
+safe_div = gdp.Function(safe_div, "safe_div", [gdp.DependentType.from_type(int, "x"), gdp.DependentType.from_where_clauses('int', "y","y != 0")], {}, gdp.DependentType.from_type('float',"safe_div"))
+safe_div(1, 0)
 ```
 ##### Gradual Normalization Form
 ```python
+import gdp_typecheck_utils as gdp
 def safe_div(x: int, y: int) -> float:
-    if isinstance(x, UnknownType) or isinstance(y, UnknownType):
-        return UnknownType()
-    if not isinstance(x, int) and not isinstance(y, int):
-        raise TypeError("x, y must be of type int")
-    if not (y != 0):
-        raise ShapeError("y != 0 not satisfied")
-    __function_output__ = x / y
-    if not isinstance(__function_output__, float):
-        raise TypeError("return value must be of type float")
-    return __function_output__
+    return x / y
+
+# Call Site
+global safe_div
+safe_div = gdp.Function(safe_div, "safe_div", [gdp.DependentType.from_type(int, "x"), gdp.DependentType.from_where_clauses('int', "y","y != 0")], {}, gdp.DependentType.from_type('float',"safe_div"))
+x, y = 2, 0
+result = gdp.check("safe_div(x,y)", __parent_path__, __path__, globals(), locals())
 ```
 #### Matrix Multiplication
 ##### Gradual Dependent Version
@@ -70,11 +67,8 @@ def mat_mul(x: list where len(x[0]) == len(y) , y: list) -> list where len(mat_m
 ```
 ##### Output When Gradual Normalization returns the Unknown Type
 ```python
-def mat_mul(x: list, y: list) -> list where len(x) == len(y[0]):
-    if not isinstance(x, list) and not isinstance(y, list):
-        raise TypeError("x, y must be of type list")
-    if not len(x[0]) == len(y):
-        raise ShapeError("len(x[0]) == len(y) not satisfied")
+import gdp_runtime_utils as gdp
+def mat_mul(x: list, y: list) -> list:
     out = []
     for i in range(len(x)):
         out.append([])
@@ -82,35 +76,52 @@ def mat_mul(x: list, y: list) -> list where len(x) == len(y[0]):
             out[i].append(0)
             for k in range(len(y)):
                 out[i][j] += x[i][k] * y[k][j]
-    
-    if not isinstance(out, list):
-        raise TypeError("return value must be of type list")
-    if not len(out) == len(y[0]):
-        raise ShapeError("len(out) == len(y[0]) not satisfied")
     return out
+
+# Call Site
+global mat_mul
+mat_mul = gdp.Function(mat_mul, "mat_mul", [gdp.DependentType.from_type('list', "x"), gdp.DependentType.from_type('list', "y")], {}, gdp.DependentType.from_where_clauses('list', "mat_mul","len(x) == len(y[0])"))
+mat_mul([[1, 2, 3], [4, 5, 6]], [[7, 8], [9, 10], [11, 12]])
 ```
 ##### Gradual Normalization Form
 ```python
-def mat_mul(x: list, y: list) -> list where len(x) == len(y[0]):
-    if isinstance(x, UnknownType) or isinstance(y, UnknownType):
-        return UnknownType()
-    if not isinstance(x, list) and not isinstance(y, list):
-        raise TypeError("x, y must be of type list")
-    if not len(x[0]) == len(y):
-        raise ShapeError("len(x[0]) == len(y) not satisfied")
+import gdp_typecheck_utils as gdp
+from gdp_stdlib import *
+
+def mat_mul(x: list, y: list) -> list:
     out = []
-    for i in range(len(x)):
+    __r0__ = range(len(x))
+    for i in __r0__:
         out.append([])
-        for j in range(len(y[0])):
+        __r1__ = range(len(y[0]))
+        for j in __r1__:
             out[i].append(0)
-            for k in range(len(y)):
+            __r2__ = range(len(y))
+            for k in __r2__:
                 out[i][j] += x[i][k] * y[k][j]
+                if not gdp.is_total(__r2__):
+                    out = gdp.UnknownTerm()
+                    break
+  
+            if not gdp.is_total(__r1__):
+                out = gdp.UnknownTerm()
+                break
+        # If we find that a variable gets mutated in a non-total loop, then we modify the variable to have the unknown term and break the loop.
+        # This ensures that we are able to terminate the loop and propagate the unknown term.
+        if not gdp.is_total(__r0__):
+            out = gdp.UnknownTerm()
+            break
     
-    if not isinstance(out, list):
-        raise TypeError("return value must be of type list")
-    if not len(out) == len(y[0]):
-        raise ShapeError("len(out) == len(y[0]) not satisfied")
     return out
+
+
+# Call Site
+global mat_mul
+mat_mul = gdp.Function(mat_mul, "mat_mul",
+                       [gdp.DependentType.from_type('list', "x"), gdp.DependentType.from_type('list', "y")], {},
+                       gdp.DependentType.from_where_clauses('list', "mat_mul", "len(x) == len(y[0])"))
+x, y = [[1, 2, 3], [4, 5, 6]], [[7, 8], [9, 10], [11, 12]]
+result = gdp.check("mat_mul(x,y)", __parent_path__, __path__, globals(), locals())
 ```
 #### Head
 ##### Gradual Dependent Version
@@ -120,18 +131,25 @@ def head(x: list where len(x) > 0) -> Any:
 ```
 ##### Output When Gradual Normalization returns the Unknown Type
 ```python
+import gdp_runtime_utils as gdp
 def head(x: list) -> Any:
-    if not isinstance(x, list):
-        raise TypeError("x must be of type list")
-    if not len(x) > 0:
-        raise ShapeError("len(x) > 0 not satisfied")
-    __function_output__ = x[0]
-    return __function_output__
+    return x[0]
+
+# Call Site
+global head
+head = gdp.Function(head, "head", [gdp.DependentType.from_type('list', "x")], {}, gdp.DependentType.from_where_clauses('Any', "head","len(x) > 0"))
+head([1,2,3])
 ```
 ##### Gradual Normalization Form
 ```python
+import gdp_typecheck_utils as gdp
 def head(x: list) -> Any:
-    return UnknownType()
+    return x[0]
+
+# Call Site
+global head
+head = gdp.Function(head, "head", [gdp.DependentType.from_type('list', "x")], {}, gdp.DependentType.from_type('Any', "head"))
+result = gdp.check("head([1,2,3])", __parent_path__, __path__, globals(), locals())
 ```
 #### Tail
 ##### Gradual Dependent Version
@@ -141,35 +159,26 @@ def tail(x: list where len(x) > 0) -> list where len(tail) == len(x[:1]) + 1:
 ```
 ##### Output When Gradual Normalization returns the Unknown Type
 ```python
+import gdp_runtime_utils as gdp
 def tail(x: list) -> list:
-    if not isinstance(x, list):
-        raise TypeError("x must be of type list")
-    if not len(x) > 0:
-        raise ShapeError("len(x) > 0 not satisfied")
-    __function_output__ = x[1:]
-    
-    if not isinstance(__function_output__, list):
-        raise TypeError("return value must be of type list")
-    if not len(__function_output__) == len(x[:1]) + 1:
-        raise ShapeError("len(tail) == len(x[:1]) + 1 not satisfied")
-    return __function_output__
+    return x[1:]
+
+# Call Site
+global tail
+tail = gdp.Function(tail, "tail", [gdp.DependentType.from_type('list', "x")], {}, gdp.DependentType.from_where_clauses('list', "tail","len(tail) == len(x[:1]) + 1"))
+tail([1,2,3])
 ```
 ##### Gradual Normalization Form
 ```python
+import gdp_runtime_utils as gdp
 def tail(x: list) -> list:
-    if isinstance(x, UnknownType):
-        return UnknownType()
-    if not isinstance(x, list):
-        raise TypeError("x must be of type list")
-    if not len(x) > 0:
-        raise ShapeError("len(x) > 0 not satisfied")
-    __function_output__ = x[1:]
-    
-    if not isinstance(__function_output__, list):
-        raise TypeError("return value must be of type list")
-    if not len(__function_output__) == len(x[:1]) + 1:
-        raise ShapeError("len(tail) == len(x[:1]) + 1 not satisfied")
-    return __function_output__
+    return x[1:]
+
+# Call Site
+global tail
+tail = gdp.Function(tail, "tail", [gdp.DependentType.from_type('list', "x")], {}, gdp.DependentType.from_where_clauses('list', "tail","len(tail) == len(x[:1]) + 1"))
+x = [1,2,3]
+result = gdp.check("tail(x)", __parent_path__, __path__, globals(), locals())
 ```
 #### Different Return Types
 ##### Gradual Dependent Version

@@ -229,15 +229,37 @@ class UnknownTerm:
     def __sizeof__(self):
         return self
 
+
 class DependentType(DependentType):
     def __init__(self, type_name, var_name, value=None, where_clauses=None, has_clauses=None, when_clauses=None):
         super().__init__(type_name, var_name, value=value, where_clauses=where_clauses, has_clauses=has_clauses, when_clauses=when_clauses)
-    
+
     def is_reducible(self, locals, var_name):
         if isinstance(locals[var_name], UnknownTerm):
+            print(f"Value {locals[var_name]} is beta-eta reducible to {self.type_name}")
             return
         
         super().is_reducible(locals, var_name)
+
+    @staticmethod
+    def from_value(value, var_name):
+        return DependentType(type(value).__name__, var_name, value)
+
+    @staticmethod
+    def from_type(type, var_name):
+        return DependentType(type.__name__, var_name)
+
+    @staticmethod
+    def from_where_clauses(type_name, var_name, *where_clauses):
+        return DependentType(type_name, var_name, where_clauses=where_clauses)
+
+    @staticmethod
+    def from_has_clauses(type_name, var_name, *has_clauses):
+        return DependentType(type_name, var_name, has_clauses=has_clauses)
+
+    @staticmethod
+    def from_when_clauses(type_name, var_name, *when_clauses):
+        return DependentType(type_name, var_name, when_clauses=when_clauses)
     
 class FailedValue(Exception):
     def __init__(self, message="failed due to previous computation failing"):
@@ -481,6 +503,9 @@ class SharedInt:
 
     def __str__(self):
         return str(self.value)
+
+
+
 
 def attach_total(x, total):
     setattr(x, "__total__", total)

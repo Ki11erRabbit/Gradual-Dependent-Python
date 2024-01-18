@@ -42,7 +42,7 @@ def check_quicksort(path):
 
 def check_make_even(path):
     global make_even
-    make_even = Function(make_even, "make_even", [DependentType.from_where_clauses("int", "x", "x % 2 != 0")], {}, DependentType.from_where_clauses("int", "x % 2 == 0"))
+    make_even = Function(make_even, "make_even", [DependentType.from_where_clauses("int", "x", "x % 2 != 0")], {}, DependentType.from_where_clauses("int", "make_even", "make_even % 2 == 0"))
     x = 5
 
     result = check("make_even(x)", path, SharedInt(0), globals=globals(), locals=locals())

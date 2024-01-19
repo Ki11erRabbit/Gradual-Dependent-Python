@@ -15,7 +15,7 @@ def all(x):
     # (list) -> bool
     # (has '__bool__') -> bool
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(bool))
     elif '__total__' not in dir(x):
         return UnknownTerm()
     return old_all(x)
@@ -25,7 +25,7 @@ def any(x):
     # (list) -> bool
     # (has '__bool__') -> bool
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(bool))
     elif '__total__' not in dir(x):
         return UnknownTerm()
     return old_any(x)
@@ -34,7 +34,7 @@ old_ascii = ascii
 def ascii(x):
     # (has '__repr__') -> str
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(str))
     elif '__repr__' not in dir(x):
         raise AttributeError("object has no attribute '__repr__'")
     else:
@@ -44,7 +44,7 @@ old_bin = bin
 def bin(x):
     # (int) -> str
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(str))
     elif '__index__' not in dir(x):
         raise AttributeError("object has no attribute '__index__'")
     else:
@@ -56,7 +56,7 @@ def bool(x = False):
     # (has '__bool__') -> bool
     # (has '__len__') -> bool
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(bool))
     else:
         return old_bool(x)
 
@@ -65,7 +65,7 @@ def bool(x = False):
 def create_bytearray(source, encoding, errors):
     # (str) -> bytearray
     if isinstance(source, UnknownTerm) or isinstance(encoding, UnknownTerm) or isinstance(errors, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(bytearray))
     else:
         if encoding is None and errors is None:
             bytearray(source)
@@ -78,7 +78,7 @@ def create_bytearray(source, encoding, errors):
 def create_bytes(source, encoding, errors):
     # (str) -> bytes
     if isinstance(source, UnknownTerm) or isinstance(encoding, UnknownTerm) or isinstance(errors, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(bytes))
     else:
         if encoding is None and errors is None:
             bytes(source)
@@ -92,7 +92,7 @@ def create_bytes(source, encoding, errors):
 def callable(x):
     # (has '__call__') -> bool
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(bool))
     else:
         return "__call__" in dir(x)
 
@@ -101,7 +101,7 @@ old_chr = chr
 def chr(x):
     # (int) -> str
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(str))
     if not isinstance(x, int):
         raise TypeError("an integer is required for chr()")
     else:
@@ -130,7 +130,7 @@ old_enumerate = enumerate
 def enumerate(x, start=0):
     # (list) -> list
     if isinstance(x, UnknownTerm) or isinstance(start, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(list))
     elif '__total__' not in dir(x):
         return (UnknownTerm(), UnknownTerm())
     elif '__iter__' not in dir(x) and '__next__' not in dir(x):
@@ -157,7 +157,7 @@ old_filter = filter
 def filter(function, iterable):
     # (function, list) -> list
     if isinstance(function, UnknownTerm) or isinstance(iterable, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(list))
     elif '__total__' not in dir(iterable):
         return UnknownTerm()
     elif '__iter__' not in dir(iterable) and '__next__' not in dir(iterable):
@@ -171,7 +171,7 @@ old_float = float
 def float(x=0.0):
     # (int | float) -> float
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(float))
     elif isinstance(x, str):
         return old_float(x)
     elif '__float__' not in dir(x) or '__index__' not in dir(x):
@@ -183,7 +183,7 @@ old_format = format
 def format(value, format_spec=None):
     # (int | float) -> str
     if isinstance(value, UnknownTerm) or isinstance(format_spec, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(str))
     elif '__format__' not in dir(value):
         raise AttributeError("object has no attribute '__format__'")
     else:
@@ -195,7 +195,7 @@ def hash(x):
     # (int | float) -> int
     # (has '__hash__') -> int
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(int))
     elif '__hash__' not in dir(x):
         raise AttributeError("object has no attribute '__hash__'")
     else:
@@ -205,7 +205,7 @@ old_hex = hex
 def hex(x):
     # (int) -> str
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(str))
     elif '__index__' not in dir(x):
         raise AttributeError("object has no attribute '__index__'")
     else:
@@ -215,20 +215,20 @@ old_id = id
 def id(x):
     # (object) -> int
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(int))
     else:
         return old_id(x)
 
 
 def input(prompt=None):
     # (str) -> str
-    return UnknownTerm()
+    return UnknownTerm(HasTypeRule(str))
 
 old_int = int
 def int(x=0, base=10):
     # (int | float) -> int
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(int))
     elif isinstance(x, str):
         return old_int(x, base)
     elif '__index__' not in dir(x):
@@ -254,7 +254,7 @@ old_len = len
 def len(x):
     # (list) -> int
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(int))
     elif '__total__' not in dir(x):
         return UnknownTerm()
     elif '__len__' not in dir(x):
@@ -266,7 +266,7 @@ old_list = list
 def list(x):
     # (list) -> list
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(list))
     elif '__iter__' not in dir(x) and '__next__' not in dir(x):
         raise AttributeError("object has no attribute '__iter__' or '__next__'")
     else:
@@ -278,7 +278,7 @@ old_map = map
 def map(function, iterable, *iterables):
     # (function, list) -> list
     if isinstance(function, UnknownTerm) or isinstance(iterable, UnknownTerm) or isinstance(iterables, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(list))
     elif '__total__' not in dir(iterable):
         return UnknownTerm()
     elif '__iter__' not in dir(iterable) and '__next__' not in dir(iterable):
@@ -309,7 +309,7 @@ old_oct = oct
 def oct(x):
     # (int) -> str
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(str))
     elif '__index__' not in dir(x):
         raise AttributeError("object has no attribute '__index__'")
     else:
@@ -324,7 +324,7 @@ old_ord = ord
 def ord(x):
     # (str) -> int
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(int))
     elif not isinstance(x, str):
         raise TypeError("ord() expected string of length 1, but {} found".format(type(x)))
     elif len(x) != 1:
@@ -344,7 +344,7 @@ old_range = range
 def range(start, stop=None, step=1):
     # (int) -> list
     if isinstance(start, UnknownTerm) or isinstance(stop, UnknownTerm) or isinstance(step, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(list))
     elif stop is None:
         r = old_range(start)
         setattr(r, '__total__', True)
@@ -358,7 +358,7 @@ old_repr = repr
 def repr(x):
     # (object) -> str
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(str))
     else:
         return old_repr(x)
 
@@ -366,7 +366,7 @@ old_reversed = reversed
 def reversed(x):
     # (list) -> list
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(list))
     elif '__reversed__' not in dir(x):
         raise AttributeError("object has no attribute '__reversed__'")
     else:
@@ -384,7 +384,7 @@ old_set = set
 def set(x):
     # (list) -> set
     if isinstance(x, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(set))
     elif '__iter__' not in dir(x) and '__next__' not in dir(x):
         raise AttributeError("object has no attribute '__iter__' or '__next__'")
     else:
@@ -394,7 +394,7 @@ old_sorted = sorted
 def sorted(x, /, *, key=None, reverse=False):
     # (list) -> list
     if isinstance(x, UnknownTerm) or isinstance(key, UnknownTerm) or isinstance(reverse, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(list))
     elif '__total__' not in dir(x):
         return UnknownTerm()
     elif '__iter__' not in dir(x) and '__next__' not in dir(x):
@@ -408,7 +408,7 @@ old_str = str
 def str(x, encoding=None, errors=None):
     # (object) -> str
     if isinstance(x, UnknownTerm) or isinstance(encoding, UnknownTerm) or isinstance(errors, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(str))
     elif encoding is None and errors is None:
         return old_str(x)
     else:
@@ -440,7 +440,7 @@ old_zip = zip
 def zip(*iterables, strict=False):
     # (list) -> list
     if isinstance(iterables, UnknownTerm) or isinstance(strict, UnknownTerm):
-        return UnknownTerm()
+        return UnknownTerm(HasTypeRule(list))
     elif '__iter__' not in dir(iterables) and '__next__' not in dir(iterables):
         raise AttributeError("object has no attribute '__iter__' or '__next__'")
     else:

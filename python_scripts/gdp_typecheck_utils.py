@@ -1,15 +1,185 @@
 from gdp_runtime_utils import *
 
 
+class Rule:
+    # Potentially replace this with an SMT solver
+    @staticmethod
+    def check_rules(rules: list) -> bool:
+        for i in range(len(rules)):
+            for j in range(i+1, len(rules)):
+                if rules[i].contradicts(rules[j]):
+                    return False
+        return True
+
+class HasTypeRule(Rule):
+    def __init__(self, type):
+        self.type = type
+
+    def __eq__(self, other):
+        return isinstance(other, HasTypeRule) and self.type == other.type
+
+    def contradicts(self, other):
+        return isinstance(other, HasTypeRule) and self.type != other.type
+
+
+class GreaterThanRule(Rule):
+    def __init__(self, bound):
+        self.bound = bound
+
+    def __eq__(self, other):
+        return isinstance(other, GreaterThanRule) and self.bound == other.bound
+
+    def contradicts(self, other):
+        if isinstance(other, GreaterThanRule):
+            return self.bound <= other.bound
+        elif isinstance(other, LessThanRule):
+            return self.bound >= other.bound
+        elif isinstance(other, NotRule):
+            return not self.contradicts(other.rule)
+        elif isinstance(other, AndRule):
+            return any(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, OrRule):
+            return all(self.contradicts(rule) for rule in other.rules)
+        else:
+            return False
+
+class LessThanRule(Rule):
+    def __init__(self, bound):
+        self.bound = bound
+
+    def __eq__(self, other):
+        return isinstance(other, LessThanRule) and self.bound == other.bound
+
+    def contradicts(self, other):
+        if isinstance(other, LessThanRule):
+            return self.bound >= other.bound
+        elif isinstance(other, GreaterThanRule):
+            return self.bound <= other.bound
+        elif isinstance(other, NotRule):
+            return not self.contradicts(other.rule)
+        elif isinstance(other, AndRule):
+            return any(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, OrRule):
+            return all(self.contradicts(rule) for rule in other.rules)
+
+class EqualToRule(Rule):
+    def __init__(self, bound):
+        self.bound = bound
+
+    def __eq__(self, other):
+        return isinstance(other, EqualToRule) and self.bound == other.bound
+
+    def contradicts(self, other):
+        if isinstance(other, EqualToRule):
+            return self.bound != other.bound
+        elif isinstance(other, GreaterThanRule):
+            return self.bound <= other.bound
+        elif isinstance(other, LessThanRule):
+            return self.bound >= other.bound
+        elif isinstance(other, NotRule):
+            return not self.contradicts(other.rule)
+        elif isinstance(other, AndRule):
+            return any(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, OrRule):
+            return all(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, ImpliesRule):
+            return self.contradicts(other.rules[0]) or self.contradicts(other.rules[1])
+        else:
+            return False
+
+class NotRule(Rule):
+    def __init__(self, rule):
+        self.rule = rule
+
+    def __eq__(self, other):
+        return isinstance(other, NotRule) and self.rule == other.rule
+
+    def contradicts(self, other):
+        if isinstance(other, NotRule):
+            return self.rule == other.rule
+        elif isinstance(other, EqualToRule):
+            return self.rule.contradicts(other)
+        elif isinstance(other, GreaterThanRule):
+            return self.rule.contradicts(other)
+        elif isinstance(other, LessThanRule):
+            return self.rule.contradicts(other)
+        elif isinstance(other, NotRule):
+            return self.rule.contradicts(other.rule)
+        elif isinstance(other, AndRule):
+            return any(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, OrRule):
+            return all(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, ImpliesRule):
+            return self.contradicts(other.rules[0]) or self.contradicts(other.rules[1])
+        else:
+            return False
+
+
+
+
+class AndRule(Rule):
+    def __init__(self, *rules):
+        self.rules = rules
+
+    def __eq__(self, other):
+        return isinstance(other, AndRule) and self.rules == other.rules
+
+    def contradicts(self, other):
+        if isinstance(other, AndRule):
+            return any(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, OrRule):
+            return all(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, NotRule):
+            return self.contradicts(other.rule)
+        elif isinstance(other, ImpliesRule):
+            return self.contradicts(other.rules[0]) or self.contradicts(other.rules[1])
+        else:
+            return False
+
+class OrRule(Rule):
+    def __init__(self, *rules):
+        self.rules = rules
+
+    def __eq__(self, other):
+        return isinstance(other, OrRule) and self.rules == other.rules
+
+    def contradicts(self, other):
+        if isinstance(other, OrRule):
+            return all(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, AndRule):
+            return any(self.contradicts(rule) for rule in other.rules)
+        elif isinstance(other, NotRule):
+            return self.contradicts(other.rule)
+        elif isinstance(other, ImpliesRule):
+            return self.contradicts(other.rules[0]) or self.contradicts(other.rules[1])
+        else:
+            return False
+
+class ImpliesRule(Rule):
+    def __init__(self, *rules):
+        self.rules = rules
+
+    def __eq__(self, other):
+        return isinstance(other, ImpliesRule) and self.rules == other.rules
+
 class UnknownTerm:
-    def __init__(self):
-        pass
+    def __init__(self, rule=None):
+        if rule is None:
+            self.rules = []
+        else:
+            self.rules = [rule]
+
+    def add_rule(self, rule):
+        self.rules.append(rule)
+        if Rule.check_rules(self.rules):
+            raise DependentTypeError(f"Type UnknownType failed to satisfy rule {rule}")
+
 
     def __repr__(self):
-        return "UnknownTerm()"
+        return UnknownTerm(HasTypeRule(str))
 
     def __str__(self):
-        return "UnknownTerm"
+        return UnknownTerm(HasTypeRule(str))
 
     def __eq__(self, other):
         return isinstance(other, UnknownTerm)
@@ -203,7 +373,6 @@ class UnknownTerm:
     def __getstate__(self):
         return self
 
-
     def __setstate__(self, state):
         pass
 
@@ -228,6 +397,8 @@ class UnknownTerm:
 
     def __sizeof__(self):
         return self
+
+
 
 
 class DependentType(DependentType):

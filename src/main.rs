@@ -1,5 +1,5 @@
 mod compiler;
-mod type_checker;
+
 
 use rustpython_ast::unparse;
 use compiler::compile;
@@ -18,6 +18,8 @@ fn get_program2() -> String {
 
 fn main() {
     let ast = compile(&get_program2(), String::from("test.py")).unwrap();
+    println!("{:#?}\n\n", ast);
+
     let ast = unparse(ast);
-    println!("{}", ast);
+    //println!("{}", ast);
 }

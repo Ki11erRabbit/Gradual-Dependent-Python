@@ -21,7 +21,7 @@ for i in range(5):
     print(f"Loop iteration {i}")
 
 # Functions
-def square(x):
+def square(x: int where x > 0):
     return x ** 2
 
 async def square(x):
